@@ -12,7 +12,8 @@ LDFLAGS :=
 
 SRC := src/main.c \
        src/gfx/vbe.c src/gfx/draw.c src/gfx/font.c \
-       src/input/mouse.c src/input/keyboard.c
+       src/input/mouse.c src/input/keyboard.c \
+       src/wm/wm.c src/wm/widget.c
 
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
 

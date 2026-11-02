@@ -25,6 +25,23 @@ _Last updated: 2026-11-02_
   - `main.c` — desktop shell: gradient wallpaper, menu bar + live clock, demo
     windows, mouse cursor with dirty-rect restore/redraw.
 
+- **Phase 2 code (written + host-validated)**:
+  - `wm/wm.c` — z-ordered windows each with their own surface; dirty-rectangle
+    compositor into an off-screen scene; cursor overlay; title-bar dragging;
+    focus/raise with correct re-render of the de-focused window; close boxes;
+    menu bar + live clock; taskbar with active-window highlight.
+  - `wm/widget.c` — label, button (press state + callback), checkbox (toggle),
+    panel; painting + hit-testing.
+  - Rewired `main.c` to open three app windows (About / Widgets Demo / Files).
+- **Off-DOS render harness** (`tools/hostrender/`): the real wm/draw/widget
+  code compiled with host GCC, driven by a scripted mouse, renders the actual
+  Quartz desktop to PNG. Verified: window layout, overlap/occlusion, dragging,
+  button click (counter increments), checkbox state, and single-window focus
+  (confirmed by pixel sampling). Font is the real VGA ROM 8×16 glyph set dumped
+  from QEMU over serial (`tools/getfont.asm`).
+- **Static check**: all 8 DOS modules pass `gcc -fsyntax-only -Wall` against
+  stub DJGPP headers (`tools/hoststubs/`), catching C errors pre-toolchain.
+
 ## Blocked
 
 - **DJGPP toolchain build** — the from-source build (binutils + GCC 12.2.0 from
