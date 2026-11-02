@@ -59,6 +59,9 @@ _Last updated: 2026-11-02_
   text mode, then the GUI shows link status + address.
 - Verified on FreeDOS in QEMU (NE2000 + SLIRP): **DHCP lease 10.0.2.15**,
   mask 255.255.255.0, DNS 10.0.2.3, shown in the Network window.
+- **Networking is lazy**: Quartz never touches the network at startup; the GUI
+  always loads instantly and TCP/IP is brought up on demand via the Network
+  window's **Connect** button. No packet driver / NIC required to run.
 - For metal (RTL8169) a matching packet driver is still to be sourced (Phase 5).
 
 ## Next

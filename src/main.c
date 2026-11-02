@@ -59,9 +59,33 @@ static void make_counter(void)
     qz_window_add(w, qz_button(150, 70, 110, 28, "Close", cb_close_owner));
 }
 
-/* ---- Network app ---- */
-static qz_netinfo g_net;
-static qz_widget *g_resolve_label = 0;
+/* ---- Network app (lazy: nothing touches the network until Connect) ---- */
+static qz_netinfo g_net;      /* zeroed => not connected */
+static qz_widget *g_net_l1 = 0, *g_net_l2 = 0, *g_net_l3 = 0, *g_resolve_label = 0;
+
+static void net_update_labels(void)
+{
+    if (!g_net_l1) return;
+    if (g_net.up) {
+        strcpy(g_net_l1->text, "Status : UP (DHCP)");
+        sprintf(g_net_l2->text, "IP   : %s", g_net.ip);
+        sprintf(g_net_l3->text, "Mask : %s  DNS: %s", g_net.mask, g_net.dns);
+    } else {
+        strcpy(g_net_l1->text, "Status : not connected");
+        snprintf(g_net_l2->text, sizeof g_net_l2->text, "%.59s",
+                 g_net.err[0] ? g_net.err : "click Connect to start TCP/IP");
+        g_net_l3->text[0] = 0;
+    }
+    if (g_net_l1->owner) qz_window_invalidate(g_net_l1->owner);
+}
+
+static void cb_connect(qz_widget *w)
+{
+    qz_net_init(&g_net);          /* loads packet driver + DHCP, on demand */
+    net_update_labels();
+    (void)w;
+}
+
 static void cb_resolve(qz_widget *w)
 {
     char ip[20];
@@ -70,32 +94,27 @@ static void cb_resolve(qz_widget *w)
         qz_net_resolve("www.google.com", ip);
         sprintf(g_resolve_label->text, "www.google.com -> %s", ip);
     } else {
-        strcpy(g_resolve_label->text, "offline - no link");
+        strcpy(g_resolve_label->text, "not connected");
     }
     if (g_resolve_label->owner) qz_window_invalidate(g_resolve_label->owner);
     (void)w;
 }
+
 static void make_network(void)
 {
     qz_window *w = qz_window_new(610, 90, 360, 210, "Network", QZ_WF_DEFAULT);
-    char l1[64], l2[64], l3[80];
     if (!w) return;
-    if (g_net.up) {
-        sprintf(l1, "Status : UP (DHCP)");
-        sprintf(l2, "IP     : %s", g_net.ip);
-        sprintf(l3, "Mask   : %s   DNS: %s", g_net.mask, g_net.dns);
-    } else {
-        sprintf(l1, "Status : offline");
-        sprintf(l2, "%.40s", g_net.err[0] ? g_net.err : "no packet driver / link");
-        l3[0] = 0;
-    }
     qz_window_add(w, qz_label(16, 12, "Quartz TCP/IP (Watt-32)"));
-    qz_window_add(w, qz_label(16, 40, l1));
-    qz_window_add(w, qz_label(16, 60, l2));
-    if (l3[0]) qz_window_add(w, qz_label(16, 80, l3));
-    g_resolve_label = qz_label(16, 112, "(resolve test not run)");
+    g_net_l1 = qz_label(16, 40, "Status : not connected");
+    g_net_l2 = qz_label(16, 60, "click Connect to start TCP/IP");
+    g_net_l3 = qz_label(16, 80, "");
+    qz_window_add(w, g_net_l1);
+    qz_window_add(w, g_net_l2);
+    qz_window_add(w, g_net_l3);
+    g_resolve_label = qz_label(16, 112, "(not connected)");
     qz_window_add(w, g_resolve_label);
-    qz_window_add(w, qz_button(16, 134, 180, 26, "Resolve google.com", cb_resolve));
+    qz_window_add(w, qz_button(16, 134, 110, 26, "Connect", cb_connect));
+    qz_window_add(w, qz_button(136, 134, 150, 26, "Resolve google.com", cb_resolve));
 }
 
 static void make_files(void)
@@ -115,13 +134,8 @@ int main(void)
 {
     int rc;
 
-    /* Bring up networking in text mode first (packet driver + DHCP), so any
-     * Watt-32 console output is visible and DHCP completes before graphics. */
-    printf("Quartz: initializing network...\n");
-    qz_net_init(&g_net);
-    if (g_net.up) printf("Quartz: network up, IP %s\n", g_net.ip);
-    else          printf("Quartz: network offline (%s)\n", g_net.err);
-
+    /* Quartz never blocks on the network at startup: the GUI comes up first and
+     * TCP/IP is brought up on demand from the Network window's Connect button. */
     rc = qz_gfx_init(1024, 768);
     if (rc != 0) { printf("Quartz: no VESA LFB mode (err %d)\n", rc); return 1; }
     qz_font_init();
