@@ -12,14 +12,26 @@ export MTOOLS_SKIP_CHECK=1
 
 APP=""
 RUN=""
+NET=""          # "" | ne2000 | pcnet | e1000
 EXTRA=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app) APP="$2"; shift 2;;
     --run) RUN="$2"; shift 2;;
+    --net) NET="$2"; shift 2;;
     *) EXTRA+=("$1"); shift;;
   esac
 done
+
+# packet driver selection (software int 0x60)
+PKT_FILE=""; PKT_LOAD=""
+case "$NET" in
+  ne2000) PKT_FILE="third_party/freedos/pktdrv/NE2000.COM"; PKT_LOAD="NE2000.COM 0x60 3 0x300";;
+  pcnet)  PKT_FILE="third_party/freedos/pktdrv/PCNTPK.COM"; PKT_LOAD="PCNTPK.COM 0x60";;
+  e1000)  PKT_FILE="third_party/freedos/pktdrv/E1000PKT.COM"; PKT_LOAD="E1000PKT.COM 0x60";;
+  "") ;;
+  *) echo "mkdisk: unknown --net '$NET'"; exit 1;;
+esac
 [[ -n "$APP" ]] || { echo "mkdisk: --app required"; exit 1; }
 [[ -f "$APP" ]] || { echo "mkdisk: app '$APP' not found"; exit 1; }
 APPNAME="$(basename "$APP" | tr '[:lower:]' '[:upper:]')"
@@ -78,9 +90,24 @@ mkfs.fat --offset "$PART_START" -F 16 -n QUARTZ "$DISK" >/dev/null
 MT="$DISK@@1M"                       # mtools offset to the partition
 mcopy -o -i "$MT" "$CWS" ::CWSDPMI.EXE
 mcopy -o -i "$MT" "$APP" "::$APPNAME"
-# AUTORUN.BAT
-printf '@echo off\r\n%s\r\n' "$RUN" > build/AUTORUN.BAT
+
+# AUTORUN.BAT (optionally load packet driver + Watt-32 DHCP config)
+{
+  printf '@echo off\r\n'
+  if [[ -n "$NET" ]]; then
+    printf 'SET WATTCP.CFG=C:\\\r\n'
+    printf '%s\r\n' "$PKT_LOAD"
+  fi
+  printf '%s\r\n' "$RUN"
+} > build/AUTORUN.BAT
 mcopy -o -i "$MT" build/AUTORUN.BAT ::AUTORUN.BAT
+
+if [[ -n "$NET" ]]; then
+  [[ -f "$PKT_FILE" ]] || { echo "mkdisk: packet driver $PKT_FILE missing"; exit 1; }
+  mcopy -o -i "$MT" "$PKT_FILE" "::$(basename "$PKT_FILE" | tr '[:lower:]' '[:upper:]')"
+  printf 'my_ip = dhcp\r\nhostname = quartz\r\n' > build/WATTCP.CFG
+  mcopy -o -i "$MT" build/WATTCP.CFG ::WATTCP.CFG
+fi
 for f in "${EXTRA[@]:-}"; do
   [[ -n "$f" && -f "$f" ]] && mcopy -o -i "$MT" "$f" "::$(basename "$f" | tr '[:lower:]' '[:upper:]')"
 done

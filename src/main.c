@@ -5,6 +5,7 @@
 #include "gfx/gfx.h"
 #include "input/input.h"
 #include "wm/wm.h"
+#include "net/net.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -58,6 +59,45 @@ static void make_counter(void)
     qz_window_add(w, qz_button(150, 70, 110, 28, "Close", cb_close_owner));
 }
 
+/* ---- Network app ---- */
+static qz_netinfo g_net;
+static qz_widget *g_resolve_label = 0;
+static void cb_resolve(qz_widget *w)
+{
+    char ip[20];
+    if (!g_resolve_label) return;
+    if (g_net.up) {
+        qz_net_resolve("www.google.com", ip);
+        sprintf(g_resolve_label->text, "www.google.com -> %s", ip);
+    } else {
+        strcpy(g_resolve_label->text, "offline - no link");
+    }
+    if (g_resolve_label->owner) qz_window_invalidate(g_resolve_label->owner);
+    (void)w;
+}
+static void make_network(void)
+{
+    qz_window *w = qz_window_new(610, 90, 360, 210, "Network", QZ_WF_DEFAULT);
+    char l1[64], l2[64], l3[80];
+    if (!w) return;
+    if (g_net.up) {
+        sprintf(l1, "Status : UP (DHCP)");
+        sprintf(l2, "IP     : %s", g_net.ip);
+        sprintf(l3, "Mask   : %s   DNS: %s", g_net.mask, g_net.dns);
+    } else {
+        sprintf(l1, "Status : offline");
+        sprintf(l2, "%.40s", g_net.err[0] ? g_net.err : "no packet driver / link");
+        l3[0] = 0;
+    }
+    qz_window_add(w, qz_label(16, 12, "Quartz TCP/IP (Watt-32)"));
+    qz_window_add(w, qz_label(16, 40, l1));
+    qz_window_add(w, qz_label(16, 60, l2));
+    if (l3[0]) qz_window_add(w, qz_label(16, 80, l3));
+    g_resolve_label = qz_label(16, 112, "(resolve test not run)");
+    qz_window_add(w, g_resolve_label);
+    qz_window_add(w, qz_button(16, 134, 180, 26, "Resolve google.com", cb_resolve));
+}
+
 static void make_files(void)
 {
     qz_window *w = qz_window_new(560, 330, 320, 220, "Files", QZ_WF_DEFAULT);
@@ -73,13 +113,23 @@ static void make_files(void)
 
 int main(void)
 {
-    int rc = qz_gfx_init(1024, 768);
+    int rc;
+
+    /* Bring up networking in text mode first (packet driver + DHCP), so any
+     * Watt-32 console output is visible and DHCP completes before graphics. */
+    printf("Quartz: initializing network...\n");
+    qz_net_init(&g_net);
+    if (g_net.up) printf("Quartz: network up, IP %s\n", g_net.ip);
+    else          printf("Quartz: network offline (%s)\n", g_net.err);
+
+    rc = qz_gfx_init(1024, 768);
     if (rc != 0) { printf("Quartz: no VESA LFB mode (err %d)\n", rc); return 1; }
     qz_font_init();
     if (qz_wm_init() != 0) { qz_gfx_shutdown(); printf("Quartz: WM init failed\n"); return 1; }
 
     make_files();
     make_counter();
+    make_network();
     make_about();           /* opened last -> focused, on top */
 
     while (qz_wm_run_once())

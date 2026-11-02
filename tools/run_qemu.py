@@ -64,6 +64,7 @@ def main():
     ap.add_argument("--shots", type=int, default=1, help="number of screenshots")
     ap.add_argument("--interval", type=float, default=3.0, help="seconds between shots")
     ap.add_argument("--serial", default=os.path.join(ROOT, "dist", "serial.log"))
+    ap.add_argument("--net", default="", help="ne2000 | pcnet | e1000 (adds a NIC + user networking)")
     args = ap.parse_args()
 
     tmpd = tempfile.mkdtemp(prefix="quartz-qemu-")
@@ -84,6 +85,16 @@ def main():
         cmd += ["-fda", args.boot]
     if args.disk and os.path.exists(args.disk):
         cmd += ["-hda", args.disk]
+    if args.net:
+        cmd += ["-netdev", "user,id=n0"]
+        if args.net == "ne2000":
+            cmd += ["-device", "ne2k_isa,netdev=n0,irq=3,iobase=0x300"]
+        elif args.net == "pcnet":
+            cmd += ["-device", "pcnet,netdev=n0"]
+        elif args.net == "e1000":
+            cmd += ["-device", "e1000,netdev=n0"]
+        else:
+            cmd += ["-device", args.net + ",netdev=n0"]
 
     print("launching:", " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)

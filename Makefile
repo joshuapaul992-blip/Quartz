@@ -7,13 +7,16 @@ DJGPP_PREFIX ?= /opt/djgpp
 CC      := $(DJGPP_PREFIX)/bin/i586-pc-msdosdjgpp-gcc
 STRIP   := $(DJGPP_PREFIX)/bin/i586-pc-msdosdjgpp-strip
 
-CFLAGS  := -O2 -Wall -Isrc
-LDFLAGS :=
+WATT32  := third_party/watt32
+CFLAGS  := -O2 -Wall -Isrc -I$(WATT32)/inc
+LDFLAGS := -L$(WATT32)/lib
+LDLIBS  := -lwatt
 
 SRC := src/main.c \
        src/gfx/vbe.c src/gfx/draw.c src/gfx/font.c \
        src/input/mouse.c src/input/keyboard.c \
-       src/wm/wm.c src/wm/widget.c
+       src/wm/wm.c src/wm/widget.c \
+       src/net/net.c
 
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
 
@@ -28,7 +31,7 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(APP): $(OBJ)
-	$(CC) $(LDFLAGS) $(OBJ) -o $@
+	$(CC) $(LDFLAGS) $(OBJ) $(LDLIBS) -o $@
 	$(STRIP) $@
 
 # Build bootable floppy + data disk carrying quartz.exe
