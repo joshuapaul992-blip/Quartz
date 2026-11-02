@@ -1,0 +1,5 @@
+build/
+dist/
+*.o
+third_party/freedos/*.img
+third_party/cwsdpmi/*.EXE
