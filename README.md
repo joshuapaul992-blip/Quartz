@@ -1,5 +1,7 @@
 # Quartz
 
+![Quartz running on FreeDOS](docs/img/quartz-on-freedos.png)
+
 A from-scratch graphical environment for **FreeDOS**, targeting real hardware
 (daily-usable retro system). Quartz is a 32-bit protected-mode desktop that
 owns the screen through the **VESA VBE linear framebuffer** and sits on top of

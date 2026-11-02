@@ -42,17 +42,28 @@ _Last updated: 2026-11-02_
 - **Static check**: all 8 DOS modules pass `gcc -fsyntax-only -Wall` against
   stub DJGPP headers (`tools/hoststubs/`), catching C errors pre-toolchain.
 
-## Blocked
+## Running on FreeDOS (toolchain unblocked)
 
-- **DJGPP toolchain build** — the from-source build (binutils + GCC 12.2.0 from
-  gnu.org / delorie.com mirrors) is blocked by the sandbox's auto-permission
-  classifier ("Code from External"), because it executes third-party
-  `configure`/`make`. Needs an explicit permission grant to proceed. Until then,
-  `build/quartz.exe` cannot be produced and Phase 1 code is unverified.
+- **DJGPP GCC 12.2.0** cross-compiler built from source at `/opt/djgpp`.
+- `make` builds `build/quartz.exe` (DJGPP go32 extender) with **zero warnings**.
+- **Quartz boots and renders on FreeDOS in QEMU**: real INT 10h VBE mode-set,
+  DPMI physical-framebuffer mapping, `movedata` present, INT 10h ROM-font text,
+  INT 33h mouse (ctmouse). Runtime-selected 1152×864×32 LFB. The on-DOS render
+  matches the host preview exactly — Phase 1 + Phase 2 validated end-to-end on
+  the actual OS.
 
 ## Next
 
-1. Build the toolchain (pending permission) → `make run` → verify Phase 1
-   renders in QEMU; fix any compile/runtime issues.
-2. Vendor `ctmouse` (CuteMouse) for a working cursor in QEMU and on hardware.
-3. Phase 2: window manager + widgets.
+1. **Phase 3 — networking**: integrate Watt-32 (staged) + an RTL8169 packet
+   driver; DHCP; a simple net app (status / ping / fetch).
+2. **Phase 4 — audio**: SBEMU bridging SB16 → the Realtek HDA codec; GUI sound.
+3. Richer WM/apps: keyboard focus, text-input widget, drop-down menus, dialogs.
+4. **Phase 5 — hardware bring-up** on the i7-8700 / GTX 1070 / RTL8169 box:
+   bootable USB, validate VBE modes, ctmouse with USB mouse, packet driver +
+   DHCP, SBEMU on the real ALC codec.
+
+## Toolchain (resolved)
+
+The DJGPP build from source was initially blocked by the sandbox's
+auto-permission classifier; after switching the session to acceptEdits it built
+cleanly (binutils + GCC 12.2.0) at `/opt/djgpp`. See `docs/TOOLCHAIN.md`.
