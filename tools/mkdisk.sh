@@ -38,7 +38,7 @@ cat > build/FDAUTO.BAT <<'EOF'
 @echo off
 SET DOSDIR=\FREEDOS
 SET PATH=\FREEDOS\BIN;C:\;C:\QUARTZ
-if exist \FREEDOS\BIN\CTMOUSE.EXE \FREEDOS\BIN\CTMOUSE.EXE
+if exist \CTMOUSE.EXE \CTMOUSE.EXE
 C:
 if exist \AUTORUN.BAT call \AUTORUN.BAT
 EOF
@@ -47,9 +47,8 @@ sed -i 's/$/\r/' build/FDAUTO.BAT
 mdel  -i dist/boot.img ::SETUP.BAT 2>/dev/null || true
 mcopy -o -i dist/boot.img build/FDCONFIG.SYS ::FDCONFIG.SYS
 mcopy -o -i dist/boot.img build/FDAUTO.BAT   ::FDAUTO.BAT
-# vendor ctmouse onto the floppy if we have it
+# vendor ctmouse onto the floppy root so FDAUTO can load it
 if [[ -f third_party/freedos/CTMOUSE.EXE ]]; then
-  mcopy -o -i dist/boot.img third_party/freedos/CTMOUSE.EXE ::FREEDOS/BIN/CTMOUSE.EXE 2>/dev/null || \
   mcopy -o -i dist/boot.img third_party/freedos/CTMOUSE.EXE ::CTMOUSE.EXE
 fi
 
