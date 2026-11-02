@@ -7,9 +7,12 @@ qz_surface *qz_screen = 0;
 
 qz_color qz_rgb(int r, int g, int b)
 {
-    if (r < 0) r = 0; if (r > 255) r = 255;
-    if (g < 0) g = 0; if (g > 255) g = 255;
-    if (b < 0) b = 0; if (b > 255) b = 255;
+    if (r < 0) r = 0;
+    if (r > 255) r = 255;
+    if (g < 0) g = 0;
+    if (g > 255) g = 255;
+    if (b < 0) b = 0;
+    if (b > 255) b = 255;
     return ((qz_color)(r >> (8 - qz_vmode.rsz)) << qz_vmode.rpos)
          | ((qz_color)(g >> (8 - qz_vmode.gsz)) << qz_vmode.gpos)
          | ((qz_color)(b >> (8 - qz_vmode.bsz)) << qz_vmode.bpos);

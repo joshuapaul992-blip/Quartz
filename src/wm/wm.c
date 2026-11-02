@@ -255,10 +255,14 @@ static void blit_clip(qz_surface *src, int dx, int dy,
                       int clx, int cly, int clw, int clh, long ckey)
 {
     int x0 = dx, y0 = dy, x1 = dx + src->w, y1 = dy + src->h, row;
-    if (x0 < clx) x0 = clx; if (y0 < cly) y0 = cly;
-    if (x1 > clx + clw) x1 = clx + clw; if (y1 > cly + clh) y1 = cly + clh;
-    if (x0 < 0) x0 = 0; if (y0 < 0) y0 = 0;
-    if (x1 > g_scene->w) x1 = g_scene->w; if (y1 > g_scene->h) y1 = g_scene->h;
+    if (x0 < clx) x0 = clx;
+    if (y0 < cly) y0 = cly;
+    if (x1 > clx + clw) x1 = clx + clw;
+    if (y1 > cly + clh) y1 = cly + clh;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > g_scene->w) x1 = g_scene->w;
+    if (y1 > g_scene->h) y1 = g_scene->h;
     for (row = y0; row < y1; row++) {
         qz_color *sp = src->pixels + (long)(row - dy) * src->pitch + (x0 - dx);
         qz_color *dp = g_scene->pixels + (long)row * g_scene->pitch + x0;
@@ -482,10 +486,12 @@ int qz_wm_run_once(void)
             if (g_dirty) { px0 = g_dminx; py0 = g_dminy; px1 = g_dmaxx; py1 = g_dmaxy; }
             else { px0 = py0 = 1 << 29; px1 = py1 = -(1 << 29); }
             /* include old + new cursor boxes */
-            if (g_pcx < px0) px0 = g_pcx; if (g_pcy < py0) py0 = g_pcy;
+            if (g_pcx < px0) px0 = g_pcx;
+            if (g_pcy < py0) py0 = g_pcy;
             if (g_pcx + CUR_W > px1) px1 = g_pcx + CUR_W;
             if (g_pcy + CUR_H > py1) py1 = g_pcy + CUR_H;
-            if (g_cx < px0) px0 = g_cx; if (g_cy < py0) py0 = g_cy;
+            if (g_cx < px0) px0 = g_cx;
+            if (g_cy < py0) py0 = g_cy;
             if (g_cx + CUR_W > px1) px1 = g_cx + CUR_W;
             if (g_cy + CUR_H > py1) py1 = g_cy + CUR_H;
             copy_scene_to_screen(px0, py0, px1 - px0, py1 - py0);
