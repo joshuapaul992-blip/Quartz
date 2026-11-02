@@ -52,11 +52,18 @@ _Last updated: 2026-11-02_
   matches the host preview exactly — Phase 1 + Phase 2 validated end-to-end on
   the actual OS.
 
+## Phase 3 — networking (done, validated)
+
+- Vendored prebuilt **DJGPP Watt-32** (`libwatt.a` + headers) + packet drivers
+  (NE2000/PCnet/E1000). `src/net` brings up the stack (packet driver + DHCP) in
+  text mode, then the GUI shows link status + address.
+- Verified on FreeDOS in QEMU (NE2000 + SLIRP): **DHCP lease 10.0.2.15**,
+  mask 255.255.255.0, DNS 10.0.2.3, shown in the Network window.
+- For metal (RTL8169) a matching packet driver is still to be sourced (Phase 5).
+
 ## Next
 
-1. **Phase 3 — networking**: integrate Watt-32 (staged) + an RTL8169 packet
-   driver; DHCP; a simple net app (status / ping / fetch).
-2. **Phase 4 — audio**: SBEMU bridging SB16 → the Realtek HDA codec; GUI sound.
+1. **Phase 4 — audio**: SBEMU bridging SB16 → the Realtek HDA codec; GUI sound.
 3. Richer WM/apps: keyboard focus, text-input widget, drop-down menus, dialogs.
 4. **Phase 5 — hardware bring-up** on the i7-8700 / GTX 1070 / RTL8169 box:
    bootable USB, validate VBE modes, ctmouse with USB mouse, packet driver +
