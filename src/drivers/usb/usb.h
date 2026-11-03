@@ -10,6 +10,9 @@
  * over the serial debug port. */
 int qz_usb_init(void);
 
+/* Last qz_usb_init() return code (0 = mouse ready; negative = failure stage). */
+int qz_usb_result(void);
+
 /* Nonzero if a USB HID mouse is active. */
 int qz_usb_mouse_present(void);
 

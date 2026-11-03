@@ -193,7 +193,13 @@ static void ctx_set(unsigned ctx_off, int entry, int dword, uint32_t v)
 static void zero(unsigned off, unsigned n){ unsigned i; for (i = 0; i < n; i += 4) dw(off + i, 0); }
 
 /* ---- bring-up ---- */
-int qz_usb_init(void)
+static int g_init_rc = -99;
+int qz_usb_result(void) { return g_init_rc; }
+
+static int usb_bringup(void);
+int qz_usb_init(void) { g_init_rc = usb_bringup(); return g_init_rc; }
+
+static int usb_bringup(void)
 {
     qz_pci_dev pd;
     unsigned long bar;

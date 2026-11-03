@@ -48,8 +48,14 @@ static void make_about(void)
     sprintf(info, "Display: %dx%d  %d-bpp VESA LFB", qz_vmode.w, qz_vmode.h, qz_vmode.bpp);
     qz_window_add(w, qz_label(16, 58, info));
     qz_window_add(w, qz_label(16, 74, "No mouse? Arrows move, Enter clicks, Ctrl+Q quits"));
-    qz_window_add(w, qz_checkbox(16, 96, "Show grid on desktop", 0, 0));
-    qz_window_add(w, qz_checkbox(16, 118, "Enable sounds", 1, 0));
+    {
+        static char us[64];
+        if (qz_usb_mouse_present()) strcpy(us, "USB mouse: ACTIVE (native)");
+        else sprintf(us, "USB mouse: inactive (init rc=%d)", qz_usb_result());
+        qz_window_add(w, qz_label(16, 90, us));
+    }
+    qz_window_add(w, qz_checkbox(16, 112, "Show grid on desktop", 0, 0));
+    qz_window_add(w, qz_checkbox(16, 134, "Enable sounds", 1, 0));
     qz_window_add(w, qz_button(16, w->h - QZ_TB_H - QZ_WB - 60, 90, 26, "OK", cb_close_owner));
 }
 
@@ -182,10 +188,16 @@ static void make_devices(void)
     if (qz_pci_find(0x0C, 0x03, 0x30, 0, &xhci) == 0) {
         sprintf(line, "xHCI USB3 ctrl @ %02x:%02x.%d  %04x:%04x",
                 xhci.bus, xhci.dev, xhci.fn, xhci.vendor, xhci.device);
-        qz_window_add(w, qz_label(12, y, line));
+        qz_window_add(w, qz_label(12, y, line)); y += 18;
     } else {
-        qz_window_add(w, qz_label(12, y, "No xHCI controller found"));
+        qz_window_add(w, qz_label(12, y, "No xHCI controller found")); y += 18;
     }
+    /* native USB mouse status (so a photo shows what happened) */
+    if (qz_usb_mouse_present())
+        sprintf(line, "USB mouse: ACTIVE (native xHCI driver)");
+    else
+        sprintf(line, "USB mouse: not active (init rc=%d)", qz_usb_result());
+    qz_window_add(w, qz_label(12, y, line));
 }
 
 static void make_files(void)
