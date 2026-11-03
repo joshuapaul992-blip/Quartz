@@ -39,7 +39,7 @@ static void about_paint(qz_window *win)
 
 static void make_about(void)
 {
-    qz_window *w = qz_window_new(260, 120, 420, 260, "About Quartz", QZ_WF_DEFAULT);
+    qz_window *w = qz_window_new(210, 120, 540, 260, "About Quartz", QZ_WF_DEFAULT);
     char info[96];
     if (!w) return;
     w->on_paint = about_paint;
@@ -49,13 +49,14 @@ static void make_about(void)
     qz_window_add(w, qz_label(16, 58, info));
     qz_window_add(w, qz_label(16, 74, "No mouse? Arrows move, Enter clicks, Ctrl+Q quits"));
     {
-        static char us[72];
-        int pk = qz_usb_ports();
+        static char us[96];
+        int pk = qz_usb_ports(), ed = qz_usb_epdbg();
         if (qz_usb_mouse_present())
             sprintf(us, "USB mouse: ACTIVE (native)  ports=%d conn=%d", pk >> 8, pk & 0xFF);
         else
-            sprintf(us, "USB mouse: inactive rc=%d cc=%d  ports=%d conn=%d",
-                    qz_usb_result(), qz_usb_lastcc(), pk >> 8, pk & 0xFF);
+            sprintf(us, "USB mouse: inactive rc=%d cc=%d conn=%d spd=%d ep=%d mps=%d iv=%d",
+                    qz_usb_result(), qz_usb_lastcc(), pk & 0xFF,
+                    (ed >> 24) & 0xF, (ed >> 16) & 0xFF, (ed >> 4) & 0xFFF, ed & 0xF);
         qz_window_add(w, qz_label(16, 90, us));
     }
     qz_window_add(w, qz_checkbox(16, 112, "Show grid on desktop", 0, 0));

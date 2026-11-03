@@ -61,6 +61,7 @@ static int  g_hid_mps;
 static int  g_iface;         /* HID interface number */
 static int  g_maxports, g_conn;   /* root-hub port count / connected count */
 static int  g_last_cc = -1;       /* last completion code seen (for diagnosis) */
+static int  g_dbg_speed, g_dbg_mps, g_dbg_iv;  /* endpoint params for diagnosis */
 
 /* ---- small helpers ---- */
 static void udelay(int n){ volatile int i; while(n-- > 0) for(i=0;i<200;i++); }
@@ -200,6 +201,11 @@ static int g_init_rc = -99;
 int qz_usb_result(void) { return g_init_rc; }
 int qz_usb_ports(void) { return (g_maxports << 8) | (g_conn & 0xFF); }
 int qz_usb_lastcc(void) { return g_last_cc; }
+int qz_usb_epdbg(void)
+{
+    return ((g_dbg_speed & 0xF) << 24) | ((g_hid_ep & 0xFF) << 16)
+         | ((g_dbg_mps & 0xFFF) << 4) | (g_dbg_iv & 0xF);
+}
 
 static int usb_bringup(void);
 int qz_usb_init(void) { g_init_rc = usb_bringup(); return g_init_rc; }
@@ -432,6 +438,7 @@ static int usb_bringup(void)
                         }
                         /* interrupt-IN EP context */
                         ctx_set(O_INCTX, g_hid_ep, 0, ((uint32_t)iv << 16));
+                        g_dbg_speed = speed; g_dbg_mps = ep_mps; g_dbg_iv = iv;
                     }
                     ctx_set(O_INCTX, g_hid_ep, 1, (3u << 1) | (7u << 3) | ((uint32_t)ep_mps << 16));
                     ctx_set(O_INCTX, g_hid_ep, 2, (uint32_t)dphys(O_HIDRING) | 1);

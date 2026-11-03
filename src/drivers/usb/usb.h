@@ -19,6 +19,9 @@ int qz_usb_ports(void);
 /* Last xHCI command/transfer completion code seen (1 = success). */
 int qz_usb_lastcc(void);
 
+/* Packed endpoint diagnosis: (speed<<24)|(epid<<16)|(mps<<4)|interval. */
+int qz_usb_epdbg(void);
+
 /* Nonzero if a USB HID mouse is active. */
 int qz_usb_mouse_present(void);
 
