@@ -112,7 +112,7 @@ int qz_gfx_init(int want_w, int want_h)
     uint32_t   modelist_lin;
     uint16_t   best = 0xFFFF;
     int        best_score = -1, best_w = 0, best_h = 0;
-    int        i;
+    int        i, want_bpp = 0;
 
     if (want_w <= 0) { want_w = 1024; want_h = 768; }
 
@@ -122,36 +122,41 @@ int qz_gfx_init(int want_w, int want_h)
     modelist_seg = (uint16_t)(vi.modes_ptr >> 16);
     modelist_lin = ((uint32_t)modelist_seg << 4) + modelist_off;
 
-    /* Scan modes; prefer exact-or-larger resolution, 32bpp, smallest area. */
-    for (i = 0; i < 512; i++) {
-        uint16_t mode = _farpeekw(_dos_ds, modelist_lin + i * 2);
-        if (mode == 0xFFFF) break;
-        if (vbe_get_mode(mode, &mi) != 0) continue;
-        if (!(mi.attributes & 0x01)) continue;   /* supported */
-        if (!(mi.attributes & 0x80)) continue;   /* linear fb */
-        if (mi.memory_model != 6) continue;       /* direct color */
-        if (mi.bpp != 32 && mi.bpp != 24) continue;
-        if (mi.w < want_w || mi.h < want_h) continue;
-        {
-            int score = 100000 - (mi.w * mi.h) / 16; /* smaller area is better */
-            if (mi.bpp == 32) score += 50000;        /* strongly prefer 32bpp */
-            if (score > best_score) {
-                best_score = score; best = mode;
-                best_w = mi.w; best_h = mi.h;
-            }
-        }
+    /* Optional bpp override (e.g. SET QUARTZ_BPP=16 in AUTOEXEC.BAT) so a user
+     * can pin a depth if their card's VBE is quirky. 0 = auto. */
+    {
+        const char *e = getenv("QUARTZ_BPP");
+        want_bpp = e ? atoi(e) : 0;
     }
 
-    if (best == 0xFFFF) {
-        /* Relax: accept any LFB direct-color mode, largest that fits memory. */
-        for (i = 0; i < 512; i++) {
-            uint16_t mode = _farpeekw(_dos_ds, modelist_lin + i * 2);
-            if (mode == 0xFFFF) break;
-            if (vbe_get_mode(mode, &mi) != 0) continue;
-            if (!(mi.attributes & 0x81)) continue;
-            if (mi.memory_model != 6) continue;
-            if (mi.bpp < 15) continue;
-            best = mode; best_w = mi.w; best_h = mi.h; break;
+    /* Two passes: first require resolution >= requested; if nothing matches,
+     * accept any LFB direct-color mode and take the largest. Depth preference
+     * 32 > 16 > 24 (16bpp 565 is simpler/safer than 24bpp). All of 16/24/32 are
+     * supported by qz_present_rect, so any of them is fine. */
+    {
+        int pass;
+        for (pass = 0; pass < 2 && best == 0xFFFF; pass++) {
+            best_score = -1;
+            for (i = 0; i < 512; i++) {
+                int rank, score;
+                uint16_t mode = _farpeekw(_dos_ds, modelist_lin + i * 2);
+                if (mode == 0xFFFF) break;
+                if (vbe_get_mode(mode, &mi) != 0) continue;
+                if ((mi.attributes & 0x81) != 0x81) continue; /* supported + LFB */
+                if (mi.memory_model != 6) continue;           /* direct color */
+                if (mi.bpp != 16 && mi.bpp != 24 && mi.bpp != 32) continue;
+                if (want_bpp && mi.bpp != want_bpp) continue;
+                if (pass == 0 && (mi.w < want_w || mi.h < want_h)) continue;
+                rank = (mi.bpp == 32) ? 3 : (mi.bpp == 16) ? 2 : 1;
+                /* pass0: smaller area better; pass1: larger area better */
+                score = rank * 1000000
+                      + (pass == 0 ? (2000000 - mi.w * mi.h / 4)
+                                   : (mi.w * mi.h / 4));
+                if (score > best_score) {
+                    best_score = score; best = mode;
+                    best_w = mi.w; best_h = mi.h;
+                }
+            }
         }
         if (best == 0xFFFF) return -2;
     }
@@ -187,6 +192,8 @@ int qz_gfx_init(int want_w, int want_h)
     return 0;
 }
 
+/* Quartz composes everything in a fixed 32-bpp XRGB8888 back buffer
+ * (0x00RRGGBB). The device pixel format is applied only at present time. */
 qz_color qz_rgb(int r, int g, int b)
 {
     if (r < 0) r = 0;
@@ -195,42 +202,66 @@ qz_color qz_rgb(int r, int g, int b)
     if (g > 255) g = 255;
     if (b < 0) b = 0;
     if (b > 255) b = 255;
-    return ((qz_color)(r >> (8 - qz_vmode.rsz)) << qz_vmode.rpos)
-         | ((qz_color)(g >> (8 - qz_vmode.gsz)) << qz_vmode.gpos)
-         | ((qz_color)(b >> (8 - qz_vmode.bsz)) << qz_vmode.bpos);
+    return ((qz_color)r << 16) | ((qz_color)g << 8) | (qz_color)b;
 }
 
-/* Copy a dirty rectangle from the back buffer to the framebuffer. For 32bpp
- * the back-buffer row maps 1:1; for 24bpp we pack on the fly. */
+/* field size helper (defaults to 8 if the BIOS left it zero) */
+static int fsz(int s) { return (s >= 1 && s <= 8) ? s : 8; }
+
+/* Copy a dirty rectangle from the XRGB8888 back buffer to the framebuffer,
+ * converting to the device's actual depth (16/24/32) and never writing past
+ * the mapped framebuffer (hard clamp to g_map.size). */
 void qz_present_rect(int x, int y, int w, int h)
 {
+    static uint8_t line[8192 * 4];
     int row;
+    int bpp = qz_vmode.bpp;
+    int bpl = (bpp == 32) ? 4 : (bpp == 24) ? 3 : 2;   /* device bytes/pixel */
+    int rsz = fsz(qz_vmode.rsz), gsz = fsz(qz_vmode.gsz), bsz = fsz(qz_vmode.bsz);
+    int std32;
+
     if (!qz_screen) return;
+    if (bpp != 16 && bpp != 24 && bpp != 32) return;   /* unsupported depth */
     if (x < 0) { w += x; x = 0; }
     if (y < 0) { h += y; y = 0; }
     if (x + w > qz_screen->w) w = qz_screen->w - x;
     if (y + h > qz_screen->h) h = qz_screen->h - y;
     if (w <= 0 || h <= 0) return;
+    if (w > 8192) w = 8192;
 
-    if (qz_vmode.bpp == 32) {
-        for (row = 0; row < h; row++) {
-            unsigned src = (unsigned)(qz_screen->pixels
-                          + (long)(y + row) * qz_screen->pitch + x);
-            unsigned dst = (unsigned)((y + row) * qz_vmode.fb_pitch + x * 4);
-            movedata(_my_ds(), src, g_fb_sel, dst, (size_t)w * 4);
+    /* fast path: 32bpp with standard 8:8:8 layout == back-buffer format */
+    std32 = (bpp == 32 && qz_vmode.rpos == 16 && qz_vmode.gpos == 8 &&
+             qz_vmode.bpos == 0 && rsz == 8 && gsz == 8 && bsz == 8);
+
+    for (row = 0; row < h; row++) {
+        qz_color   *sp  = qz_screen->pixels + (long)(y + row) * qz_screen->pitch + x;
+        unsigned    dst = (unsigned)((long)(y + row) * qz_vmode.fb_pitch + (long)x * bpl);
+        unsigned    nbytes = (unsigned)w * bpl;
+
+        if (dst >= g_map.size) break;                  /* fully off-screen */
+        if (dst + nbytes > g_map.size) nbytes = (unsigned)g_map.size - dst;
+        if (nbytes < (unsigned)bpl) continue;
+
+        if (std32) {
+            movedata(_my_ds(), (unsigned)sp, g_fb_sel, dst, nbytes);
+            continue;
         }
-    } else { /* 24bpp */
-        static uint8_t line[8192 * 3];
-        for (row = 0; row < h; row++) {
-            qz_color *sp = qz_screen->pixels + (long)(y + row) * qz_screen->pitch + x;
-            int i2;
-            for (i2 = 0; i2 < w; i2++) {
-                line[i2 * 3 + 0] = sp[i2] & 0xFF;
-                line[i2 * 3 + 1] = (sp[i2] >> 8) & 0xFF;
-                line[i2 * 3 + 2] = (sp[i2] >> 16) & 0xFF;
+        {
+            unsigned npix = nbytes / bpl, i2;
+            for (i2 = 0; i2 < npix; i2++) {
+                qz_color px = sp[i2];
+                int r = (px >> 16) & 0xFF, g = (px >> 8) & 0xFF, b = px & 0xFF;
+                unsigned long v =
+                    ((unsigned long)(r >> (8 - rsz)) << qz_vmode.rpos) |
+                    ((unsigned long)(g >> (8 - gsz)) << qz_vmode.gpos) |
+                    ((unsigned long)(b >> (8 - bsz)) << qz_vmode.bpos);
+                uint8_t *o = line + i2 * bpl;
+                o[0] = (uint8_t)(v & 0xFF);
+                o[1] = (uint8_t)((v >> 8) & 0xFF);
+                if (bpl >= 3) o[2] = (uint8_t)((v >> 16) & 0xFF);
+                if (bpl >= 4) o[3] = (uint8_t)((v >> 24) & 0xFF);
             }
-            movedata(_my_ds(), (unsigned)line, g_fb_sel,
-                     (y + row) * qz_vmode.fb_pitch + x * 3, (size_t)w * 3);
+            movedata(_my_ds(), (unsigned)line, g_fb_sel, dst, npix * bpl);
         }
     }
 }

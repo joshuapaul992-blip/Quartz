@@ -44,6 +44,12 @@ Windows: use Rufus / balenaEtcher in "DD / raw image" mode.
   NE2000/PCnet/E1000 drivers are for other NICs / emulators). Then use the
   **Connect** button in the Network app (DHCP via `WATTCP.CFG`).
 
+## Troubleshooting
+- Quartz composes internally at 32-bpp and converts to whatever depth the card's
+  VESA mode actually is (16/24/32), clamped to the framebuffer — so a 16-bpp-only
+  card works fine. If the display looks wrong, you can pin a depth by adding a
+  line to `AUTOEXEC.BAT` before Quartz, e.g. `SET QUARTZ_BPP=16` (or 24/32).
+
 ## Verify in an emulator first
 ```bash
 python3 tools/run_qemu.py --boot "" --disk dist/quartz-usb.img --wait 20

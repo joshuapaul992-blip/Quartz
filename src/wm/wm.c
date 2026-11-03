@@ -192,20 +192,15 @@ qz_widget *qz_window_add(qz_window *win, qz_widget *w)
 static void grad_fill(qz_surface *s, int x, int y, int w, int h,
                       qz_color c0, qz_color c1)
 {
-    /* vertical gradient between two packed colors (decoded via theme fields) */
+    /* vertical gradient between two XRGB8888 colors */
     int i;
-    int r0=(c0>>qz_vmode.rpos)&((1<<qz_vmode.rsz)-1);
-    int g0=(c0>>qz_vmode.gpos)&((1<<qz_vmode.gsz)-1);
-    int b0=(c0>>qz_vmode.bpos)&((1<<qz_vmode.bsz)-1);
-    int r1=(c1>>qz_vmode.rpos)&((1<<qz_vmode.rsz)-1);
-    int g1=(c1>>qz_vmode.gpos)&((1<<qz_vmode.gsz)-1);
-    int b1=(c1>>qz_vmode.bpos)&((1<<qz_vmode.bsz)-1);
-    int sh_r=8-qz_vmode.rsz, sh_g=8-qz_vmode.gsz, sh_b=8-qz_vmode.bsz;
+    int r0 = (c0 >> 16) & 0xFF, g0 = (c0 >> 8) & 0xFF, b0 = c0 & 0xFF;
+    int r1 = (c1 >> 16) & 0xFF, g1 = (c1 >> 8) & 0xFF, b1 = c1 & 0xFF;
     for (i = 0; i < h; i++) {
         int t = h > 1 ? (i * 256) / h : 0;
-        qz_color c = qz_rgb(((r0+(r1-r0)*t/256)<<sh_r),
-                            ((g0+(g1-g0)*t/256)<<sh_g),
-                            ((b0+(b1-b0)*t/256)<<sh_b));
+        qz_color c = qz_rgb(r0 + (r1 - r0) * t / 256,
+                            g0 + (g1 - g0) * t / 256,
+                            b0 + (b1 - b0) * t / 256);
         qz_hline(s, x, y + i, w, c);
     }
 }
