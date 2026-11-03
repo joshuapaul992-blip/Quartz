@@ -49,9 +49,13 @@ static void make_about(void)
     qz_window_add(w, qz_label(16, 58, info));
     qz_window_add(w, qz_label(16, 74, "No mouse? Arrows move, Enter clicks, Ctrl+Q quits"));
     {
-        static char us[64];
-        if (qz_usb_mouse_present()) strcpy(us, "USB mouse: ACTIVE (native)");
-        else sprintf(us, "USB mouse: inactive (init rc=%d)", qz_usb_result());
+        static char us[72];
+        int pk = qz_usb_ports();
+        if (qz_usb_mouse_present())
+            sprintf(us, "USB mouse: ACTIVE (native)  ports=%d conn=%d", pk >> 8, pk & 0xFF);
+        else
+            sprintf(us, "USB mouse: inactive rc=%d  ports=%d conn=%d",
+                    qz_usb_result(), pk >> 8, pk & 0xFF);
         qz_window_add(w, qz_label(16, 90, us));
     }
     qz_window_add(w, qz_checkbox(16, 112, "Show grid on desktop", 0, 0));

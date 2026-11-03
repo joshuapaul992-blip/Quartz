@@ -13,6 +13,9 @@ int qz_usb_init(void);
 /* Last qz_usb_init() return code (0 = mouse ready; negative = failure stage). */
 int qz_usb_result(void);
 
+/* Packed root-hub info: (maxports << 8) | connected_ports. */
+int qz_usb_ports(void);
+
 /* Nonzero if a USB HID mouse is active. */
 int qz_usb_mouse_present(void);
 

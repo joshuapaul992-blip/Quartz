@@ -59,6 +59,7 @@ static int  g_mouse = 0;
 static int  g_hid_ep;        /* xHCI endpoint id of the HID interrupt-IN ep */
 static int  g_hid_mps;
 static int  g_iface;         /* HID interface number */
+static int  g_maxports, g_conn;   /* root-hub port count / connected count */
 
 /* ---- small helpers ---- */
 static void udelay(int n){ volatile int i; while(n-- > 0) for(i=0;i<200;i++); }
@@ -195,6 +196,7 @@ static void zero(unsigned off, unsigned n){ unsigned i; for (i = 0; i < n; i += 
 /* ---- bring-up ---- */
 static int g_init_rc = -99;
 int qz_usb_result(void) { return g_init_rc; }
+int qz_usb_ports(void) { return (g_maxports << 8) | (g_conn & 0xFF); }
 
 static int usb_bringup(void);
 int qz_usb_init(void) { g_init_rc = usb_bringup(); return g_init_rc; }
@@ -298,11 +300,23 @@ static int usb_bringup(void)
     { int t = 100000; while ((opr(0x04) & 1) && --t) udelay(10); }
     qz_dbg("xhci: running, usbsts "); qz_dbg_hex(opr(0x04)); qz_dbg_nl();
 
+    /* Power all root-hub ports (real hardware comes up with PP=0, so CCS reads
+     * 0 until powered); then let devices settle/debounce. QEMU powers ports for
+     * us, which is why this wasn't needed in emulation. */
+    g_maxports = maxports;
+    for (p = 1; p <= maxports; p++) {
+        unsigned reg = 0x400 + (p - 1) * 0x10;
+        uint32_t sc = opr(reg);
+        if (!(sc & (1u << 9))) opw(reg, (sc & ~0x80E0u) | (1u << 9)); /* set PP */
+    }
+    { int t; for (t = 0; t < 300000; t++) (void)opr(0x04); }   /* ~settle/debounce */
+
     /* find a connected, enabled port; reset it */
     g_slot = 0;
     for (p = 1; p <= maxports; p++) {
         uint32_t sc = opr(0x400 + (p - 1) * 0x10);
         if (sc & 1) {                             /* CCS - device connected */
+            g_conn++;
             qz_dbg("xhci: port "); qz_dbg_dec(p); qz_dbg(" connected, sc "); qz_dbg_hex(sc); qz_dbg_nl();
             /* reset (write 1 to PR, preserve PP, write-1-clear change bits off) */
             opw(0x400 + (p - 1) * 0x10, (sc & ~0x80E0u) | (1u << 4));
