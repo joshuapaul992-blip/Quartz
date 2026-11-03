@@ -77,7 +77,7 @@ def main():
         "-vga", args.vga,
         "-display", "none",
         "-rtc", "base=localtime",
-        "-boot", "a",
+        "-boot", ("a" if os.path.exists(args.boot) else "c"),
         "-monitor", f"unix:{monsock},server,nowait",
         "-serial", f"file:{args.serial}",
         "-no-reboot",
