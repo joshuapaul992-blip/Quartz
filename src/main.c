@@ -44,8 +44,9 @@ static void make_about(void)
     qz_window_add(w, qz_label(16, 34, "A from-scratch GUI for FreeDOS."));
     sprintf(info, "Display: %dx%d  %d-bpp VESA LFB", qz_vmode.w, qz_vmode.h, qz_vmode.bpp);
     qz_window_add(w, qz_label(16, 58, info));
-    qz_window_add(w, qz_checkbox(16, 86, "Show grid on desktop", 0, 0));
-    qz_window_add(w, qz_checkbox(16, 108, "Enable sounds", 1, 0));
+    qz_window_add(w, qz_label(16, 74, "Quit: Ctrl+Q"));
+    qz_window_add(w, qz_checkbox(16, 96, "Show grid on desktop", 0, 0));
+    qz_window_add(w, qz_checkbox(16, 118, "Enable sounds", 1, 0));
     qz_window_add(w, qz_button(16, w->h - QZ_TB_H - QZ_WB - 60, 90, 26, "OK", cb_close_owner));
 }
 

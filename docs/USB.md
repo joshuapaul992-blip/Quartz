@@ -44,6 +44,15 @@ Windows: use Rufus / balenaEtcher in "DD / raw image" mode.
   NE2000/PCnet/E1000 drivers are for other NICs / emulators). Then use the
   **Connect** button in the Network app (DHCP via `WATTCP.CFG`).
 
+## Mouse / input
+- **Enable "USB Legacy Support" (USB keyboard/mouse emulation) in the firmware.**
+  Without it, DOS can't see a USB mouse; with it, a USB mouse appears as PS/2 and
+  the bundled `ctmouse` driver (loaded by AUTOEXEC) drives it.
+- If the mouse still isn't captured, mouse movement can leak into the keyboard
+  buffer. Quartz now ignores that (it never quits on ESC) so it won't exit on
+  movement — but the cursor won't move until the mouse is seen by DOS.
+- **Quit Quartz with Ctrl+Q.**
+
 ## Troubleshooting
 - Quartz composes internally at 32-bpp and converts to whatever depth the card's
   VESA mode actually is (16/24/32), clamped to the framebuffer — so a 16-bpp-only

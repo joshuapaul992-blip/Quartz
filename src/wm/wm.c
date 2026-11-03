@@ -445,8 +445,13 @@ int qz_wm_run_once(void)
     static char lastclk[8] = "";
     char clk[8];
 
+    /* Drain the BIOS keyboard buffer every frame. Quit ONLY on Ctrl+Q.
+     * We deliberately do not quit on ESC: on machines where no driver captures
+     * the PS/2 mouse, mouse-movement packets can leak into the BIOS keyboard
+     * buffer, and a delta of 1 is byte 0x01 == the ESC scancode -- which would
+     * make every small mouse move "press ESC" and exit. */
     while ((k = qz_key_get()) != 0)
-        if (QZ_SCAN(k) == QZ_KEY_ESC) g_quit = 1;
+        if (QZ_ASCII(k) == 0x11) g_quit = 1;   /* Ctrl+Q */
 
     qz_mouse_read(&m);
     g_cx = m.x; g_cy = m.y;
