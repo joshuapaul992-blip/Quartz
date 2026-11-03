@@ -52,6 +52,8 @@ Windows: use Rufus / balenaEtcher in "DD / raw image" mode.
   buffer. Quartz now ignores that (it never quits on ESC) so it won't exit on
   movement — but the cursor won't move until the mouse is seen by DOS.
 - **Quit Quartz with Ctrl+Q.**
+- **No working mouse?** Quartz falls back to keyboard control: **arrow keys move the cursor, Enter clicks, Ctrl+Q quits.**
+
 
 ## Troubleshooting
 - Quartz composes internally at 32-bpp and converts to whatever depth the card's

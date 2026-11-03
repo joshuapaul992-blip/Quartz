@@ -16,6 +16,7 @@ typedef struct {
  * any resolution. max_x/max_y bound the cursor (screen size - 1). */
 int  qz_mouse_init(int max_x, int max_y);
 void qz_mouse_read(qz_mouse_state *out);
+int  qz_mouse_present(void);   /* nonzero if an INT 33h mouse was detected */
 
 /* Keyboard. qz_key_get returns 0 if no key waiting, else a code:
  *   low byte  = ASCII (0 for non-ASCII)

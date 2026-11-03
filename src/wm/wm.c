@@ -35,6 +35,7 @@ static int g_dminx, g_dminy, g_dmaxx, g_dmaxy, g_dirty;
 static qz_window *g_drag; static int g_drag_ox, g_drag_oy;
 static qz_widget *g_arm;  static qz_window *g_arm_win;
 static int g_cx, g_cy, g_pcx, g_pcy, g_prev_btn;
+static int g_mouse_ok;   /* 0 => drive the cursor from the keyboard */
 
 static void set_focus(qz_window *win);   /* fwd */
 
@@ -67,6 +68,7 @@ int qz_wm_init(void)
     qz_th.accent = qz_rgb(0xe0,0x50,0x30);   qz_th.bar = qz_rgb(0xc0,0xc0,0xc0);
     g_cx = qz_vmode.w / 2; g_cy = qz_vmode.h / 2; g_pcx = g_cx; g_pcy = g_cy;
     qz_mouse_init(qz_vmode.w - 1, qz_vmode.h - 1);
+    g_mouse_ok = qz_mouse_present();   /* else fall back to keyboard cursor */
     qz_wm_invalidate_all();
     return 0;
 }
@@ -445,27 +447,47 @@ int qz_wm_run_once(void)
     static char lastclk[8] = "";
     char clk[8];
 
-    /* Drain the BIOS keyboard buffer every frame. Quit ONLY on Ctrl+Q.
-     * We deliberately do not quit on ESC: on machines where no driver captures
-     * the PS/2 mouse, mouse-movement packets can leak into the BIOS keyboard
-     * buffer, and a delta of 1 is byte 0x01 == the ESC scancode -- which would
-     * make every small mouse move "press ESC" and exit. */
-    while ((k = qz_key_get()) != 0)
-        if (QZ_ASCII(k) == 0x11) g_quit = 1;   /* Ctrl+Q */
+    /* Drain the BIOS keyboard buffer every frame. Quit ONLY on Ctrl+Q (never on
+     * ESC: on machines with no mouse driver, PS/2 mouse packets leak into the
+     * keyboard buffer and a delta of 1 is byte 0x01 == the ESC scancode). When
+     * no INT 33h mouse exists, the arrow keys drive the cursor and Enter clicks,
+     * so Quartz is fully usable keyboard-only (e.g. USB-3 mouse not emulated). */
+    {
+        int kc_dx = 0, kc_dy = 0, kc_click = 0;
+        const int STEP = 12;
+        while ((k = qz_key_get()) != 0) {
+            int sc = QZ_SCAN(k), a = QZ_ASCII(k);
+            if (a == 0x11) { g_quit = 1; }                 /* Ctrl+Q */
+            else if (!g_mouse_ok) {
+                if      (sc == QZ_KEY_LEFT)  kc_dx -= STEP;
+                else if (sc == QZ_KEY_RIGHT) kc_dx += STEP;
+                else if (sc == QZ_KEY_UP)    kc_dy -= STEP;
+                else if (sc == QZ_KEY_DOWN)  kc_dy += STEP;
+                else if (a == 0x0D)          kc_click = 1; /* Enter = click */
+            }
+        }
 
-    qz_mouse_read(&m);
-    g_cx = m.x; g_cy = m.y;
-
-    /* button edges (left) */
-    if ((m.buttons & QZ_BTN_LEFT) && !(g_prev_btn & QZ_BTN_LEFT)) handle_press(g_cx, g_cy);
-    if (!(m.buttons & QZ_BTN_LEFT) && (g_prev_btn & QZ_BTN_LEFT)) handle_release(g_cx, g_cy);
-    g_prev_btn = m.buttons;
-
-    /* dragging */
-    if (g_drag && (m.buttons & QZ_BTN_LEFT)) {
-        int nx = g_cx - g_drag_ox, ny = g_cy - g_drag_oy;
-        if (ny < QZ_MENUBAR_H) ny = QZ_MENUBAR_H;
-        qz_window_move(g_drag, nx, ny);
+        qz_mouse_read(&m);
+        if (g_mouse_ok) {
+            g_cx = m.x; g_cy = m.y;
+            if ((m.buttons & QZ_BTN_LEFT) && !(g_prev_btn & QZ_BTN_LEFT)) handle_press(g_cx, g_cy);
+            if (!(m.buttons & QZ_BTN_LEFT) && (g_prev_btn & QZ_BTN_LEFT)) handle_release(g_cx, g_cy);
+            g_prev_btn = m.buttons;
+            if (g_drag && (m.buttons & QZ_BTN_LEFT)) {
+                int nx = g_cx - g_drag_ox, ny = g_cy - g_drag_oy;
+                if (ny < QZ_MENUBAR_H) ny = QZ_MENUBAR_H;
+                qz_window_move(g_drag, nx, ny);
+            }
+        } else {
+            if (kc_dx || kc_dy) {
+                g_cx += kc_dx; g_cy += kc_dy;
+                if (g_cx < 0) g_cx = 0;
+                if (g_cy < 0) g_cy = 0;
+                if (g_cx > qz_screen->w - 1) g_cx = qz_screen->w - 1;
+                if (g_cy > qz_screen->h - 1) g_cy = qz_screen->h - 1;
+            }
+            if (kc_click) { handle_press(g_cx, g_cy); handle_release(g_cx, g_cy); }
+        }
     }
 
     /* clock tick */

@@ -66,6 +66,7 @@ def main():
     ap.add_argument("--serial", default=os.path.join(ROOT, "dist", "serial.log"))
     ap.add_argument("--net", default="", help="ne2000 | pcnet | e1000 (adds a NIC + user networking)")
     ap.add_argument("--audio", default="", help="path to capture SB16 output as a WAV file")
+    ap.add_argument("--keys", default="", help="comma-separated QEMU keynames to sendkey before the screenshot (e.g. right,right,down,ret)")
     args = ap.parse_args()
 
     tmpd = tempfile.mkdtemp(prefix="quartz-qemu-")
@@ -105,6 +106,13 @@ def main():
     shots = []
     try:
         time.sleep(args.wait)
+        if args.keys:
+            for kn in args.keys.split(","):
+                kn = kn.strip()
+                if kn:
+                    hmp(monsock, "sendkey " + kn)
+                    time.sleep(0.25)
+            time.sleep(1.0)
         for i in range(args.shots):
             ppm = os.path.join(tmpd, f"shot{i}.ppm")
             reply = hmp(monsock, f"screendump {ppm}")

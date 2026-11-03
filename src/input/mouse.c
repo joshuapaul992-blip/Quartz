@@ -28,6 +28,8 @@ int qz_mouse_init(int max_x, int max_y)
     return g_present ? 0 : -1;
 }
 
+int qz_mouse_present(void) { return g_present; }
+
 void qz_mouse_read(qz_mouse_state *out)
 {
     __dpmi_regs r;
