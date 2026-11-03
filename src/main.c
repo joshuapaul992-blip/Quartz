@@ -54,8 +54,8 @@ static void make_about(void)
         if (qz_usb_mouse_present())
             sprintf(us, "USB mouse: ACTIVE (native)  ports=%d conn=%d", pk >> 8, pk & 0xFF);
         else
-            sprintf(us, "USB mouse: inactive rc=%d  ports=%d conn=%d",
-                    qz_usb_result(), pk >> 8, pk & 0xFF);
+            sprintf(us, "USB mouse: inactive rc=%d cc=%d  ports=%d conn=%d",
+                    qz_usb_result(), qz_usb_lastcc(), pk >> 8, pk & 0xFF);
         qz_window_add(w, qz_label(16, 90, us));
     }
     qz_window_add(w, qz_checkbox(16, 112, "Show grid on desktop", 0, 0));

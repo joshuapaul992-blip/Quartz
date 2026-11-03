@@ -60,6 +60,7 @@ static int  g_hid_ep;        /* xHCI endpoint id of the HID interrupt-IN ep */
 static int  g_hid_mps;
 static int  g_iface;         /* HID interface number */
 static int  g_maxports, g_conn;   /* root-hub port count / connected count */
+static int  g_last_cc = -1;       /* last completion code seen (for diagnosis) */
 
 /* ---- small helpers ---- */
 static void udelay(int n){ volatile int i; while(n-- > 0) for(i=0;i<200;i++); }
@@ -129,6 +130,7 @@ static int wait_completion(int want_type, int *slot_out)
             int cc   = (e[2] >> 24) & 0xFF;
             if (type == want_type) {
                 if (slot_out) *slot_out = (e[3] >> 24) & 0xFF;
+                g_last_cc = cc;
                 return cc;
             }
             /* ignore other events (e.g. port status change) */
@@ -197,6 +199,7 @@ static void zero(unsigned off, unsigned n){ unsigned i; for (i = 0; i < n; i += 
 static int g_init_rc = -99;
 int qz_usb_result(void) { return g_init_rc; }
 int qz_usb_ports(void) { return (g_maxports << 8) | (g_conn & 0xFF); }
+int qz_usb_lastcc(void) { return g_last_cc; }
 
 static int usb_bringup(void);
 int qz_usb_init(void) { g_init_rc = usb_bringup(); return g_init_rc; }
@@ -413,12 +416,26 @@ static int usb_bringup(void)
                     ctx_set(O_INCTX, 0, 1, (1u << g_hid_ep) | 1u);  /* A(epid) | A0 */
                     ctx_set(O_INCTX, 1, 0, ((uint32_t)speed << 20) | ((uint32_t)g_hid_ep << 27));
                     ctx_set(O_INCTX, 1, 1, (uint32_t)p << 16);
-                    /* interrupt-IN EP context */
-                    ctx_set(O_INCTX, g_hid_ep, 0, (3u << 16));  /* Interval exponent */
+                    /* Interval field is speed-dependent; a wrong value makes
+                     * real controllers reject Configure Endpoint (Parameter
+                     * Error). HS/SS: bInterval-1. FS/LS: smallest exponent with
+                     * 2^iv*125us >= bInterval ms (clamped 3..10). */
+                    {
+                        int iv;
+                        if (speed >= 3) {           /* HS / SS */
+                            iv = ep_interval ? ep_interval - 1 : 3;
+                            if (iv < 0) iv = 0; if (iv > 15) iv = 15;
+                        } else {                    /* FS / LS (bInterval in ms) */
+                            int bi = ep_interval ? ep_interval : 10;
+                            iv = 3;
+                            while ((1 << iv) < bi * 8 && iv < 10) iv++;
+                        }
+                        /* interrupt-IN EP context */
+                        ctx_set(O_INCTX, g_hid_ep, 0, ((uint32_t)iv << 16));
+                    }
                     ctx_set(O_INCTX, g_hid_ep, 1, (3u << 1) | (7u << 3) | ((uint32_t)ep_mps << 16));
                     ctx_set(O_INCTX, g_hid_ep, 2, (uint32_t)dphys(O_HIDRING) | 1);
                     ctx_set(O_INCTX, g_hid_ep, 4, (uint32_t)ep_mps | ((uint32_t)ep_mps << 16)); /* avg TRB + Max ESIT */
-                    (void)ep_interval;
                     ring_push(&cmd_ring, (uint32_t)dphys(O_INCTX), 0, 0,
                               (12u << 10) | ((uint32_t)g_slot << 24));
                     dbw(0, 0);

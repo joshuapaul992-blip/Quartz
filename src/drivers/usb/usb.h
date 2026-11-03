@@ -16,6 +16,9 @@ int qz_usb_result(void);
 /* Packed root-hub info: (maxports << 8) | connected_ports. */
 int qz_usb_ports(void);
 
+/* Last xHCI command/transfer completion code seen (1 = success). */
+int qz_usb_lastcc(void);
+
 /* Nonzero if a USB HID mouse is active. */
 int qz_usb_mouse_present(void);
 
