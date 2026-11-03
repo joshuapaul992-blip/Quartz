@@ -6,6 +6,7 @@
 #include "input/input.h"
 #include "wm/wm.h"
 #include "net/net.h"
+#include "audio/audio.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -117,6 +118,31 @@ static void make_network(void)
     qz_window_add(w, qz_button(136, 134, 150, 26, "Resolve google.com", cb_resolve));
 }
 
+/* ---- Sound app ---- */
+static void cb_tone_a(qz_widget *w)    { qz_audio_tone(440, 300); (void)w; }
+static void cb_tone_hi(qz_widget *w)   { qz_audio_tone(880, 300); (void)w; }
+static void cb_chime(qz_widget *w)
+{
+    qz_audio_tone(523, 120); qz_audio_tone(659, 120); qz_audio_tone(784, 180);
+    (void)w;
+}
+static void make_sound(void)
+{
+    qz_window *w = qz_window_new(150, 150, 330, 170, "Sound", QZ_WF_DEFAULT);
+    char s[64];
+    if (!w) return;
+    if (qz_audio.present)
+        sprintf(s, "Sound Blaster @ 0x%X  DSP %d.%02d",
+                qz_audio.base, qz_audio.dsp_major, qz_audio.dsp_minor);
+    else
+        strcpy(s, "No Sound Blaster detected");
+    qz_window_add(w, qz_label(16, 12, "Quartz Audio (SB16 / SBEMU)"));
+    qz_window_add(w, qz_label(16, 36, s));
+    qz_window_add(w, qz_button(16, 70, 80, 28, "Tone A", cb_tone_a));
+    qz_window_add(w, qz_button(104, 70, 80, 28, "Tone Hi", cb_tone_hi));
+    qz_window_add(w, qz_button(192, 70, 100, 28, "Chime", cb_chime));
+}
+
 static void make_files(void)
 {
     qz_window *w = qz_window_new(560, 330, 320, 220, "Files", QZ_WF_DEFAULT);
@@ -136,6 +162,8 @@ int main(void)
 
     /* Quartz never blocks on the network at startup: the GUI comes up first and
      * TCP/IP is brought up on demand from the Network window's Connect button. */
+    qz_audio_init();        /* detect Sound Blaster (QEMU SB16 / SBEMU on metal) */
+
     rc = qz_gfx_init(1024, 768);
     if (rc != 0) { printf("Quartz: no VESA LFB mode (err %d)\n", rc); return 1; }
     qz_font_init();
@@ -143,8 +171,13 @@ int main(void)
 
     make_files();
     make_counter();
+    make_sound();
     make_network();
     make_about();           /* opened last -> focused, on top */
+
+    if (qz_audio.present) {  /* startup chime */
+        qz_audio_tone(523, 110); qz_audio_tone(659, 110); qz_audio_tone(784, 160);
+    }
 
     while (qz_wm_run_once())
         ;

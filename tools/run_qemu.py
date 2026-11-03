@@ -65,6 +65,7 @@ def main():
     ap.add_argument("--interval", type=float, default=3.0, help="seconds between shots")
     ap.add_argument("--serial", default=os.path.join(ROOT, "dist", "serial.log"))
     ap.add_argument("--net", default="", help="ne2000 | pcnet | e1000 (adds a NIC + user networking)")
+    ap.add_argument("--audio", default="", help="path to capture SB16 output as a WAV file")
     args = ap.parse_args()
 
     tmpd = tempfile.mkdtemp(prefix="quartz-qemu-")
@@ -95,6 +96,9 @@ def main():
             cmd += ["-device", "e1000,netdev=n0"]
         else:
             cmd += ["-device", args.net + ",netdev=n0"]
+    if args.audio:
+        cmd += ["-audiodev", "wav,id=snd0,path=" + args.audio,
+                "-device", "sb16,audiodev=snd0"]
 
     print("launching:", " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
