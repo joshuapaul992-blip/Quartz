@@ -1,6 +1,7 @@
 /* wm.c - Quartz window manager + dirty-rectangle compositor. */
 #include "wm.h"
 #include "../input/input.h"
+#include "../drivers/usb/usb.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -467,8 +468,27 @@ int qz_wm_run_once(void)
             }
         }
 
-        qz_mouse_read(&m);
-        if (g_mouse_ok) {
+        if (qz_usb_mouse_present()) {
+            /* native USB HID mouse: relative motion + button state */
+            int dx = 0, dy = 0, btn = g_prev_btn & 7;
+            qz_usb_poll_mouse(&dx, &dy, &btn);
+            if (dx || dy) {
+                g_cx += dx; g_cy += dy;
+                if (g_cx < 0) g_cx = 0;
+                if (g_cy < 0) g_cy = 0;
+                if (g_cx > qz_screen->w - 1) g_cx = qz_screen->w - 1;
+                if (g_cy > qz_screen->h - 1) g_cy = qz_screen->h - 1;
+            }
+            if ((btn & QZ_BTN_LEFT) && !(g_prev_btn & QZ_BTN_LEFT)) handle_press(g_cx, g_cy);
+            if (!(btn & QZ_BTN_LEFT) && (g_prev_btn & QZ_BTN_LEFT)) handle_release(g_cx, g_cy);
+            g_prev_btn = btn;
+            if (g_drag && (btn & QZ_BTN_LEFT)) {
+                int nx = g_cx - g_drag_ox, ny = g_cy - g_drag_oy;
+                if (ny < QZ_MENUBAR_H) ny = QZ_MENUBAR_H;
+                qz_window_move(g_drag, nx, ny);
+            }
+        } else if (g_mouse_ok) {
+            qz_mouse_read(&m);
             g_cx = m.x; g_cy = m.y;
             if ((m.buttons & QZ_BTN_LEFT) && !(g_prev_btn & QZ_BTN_LEFT)) handle_press(g_cx, g_cy);
             if (!(m.buttons & QZ_BTN_LEFT) && (g_prev_btn & QZ_BTN_LEFT)) handle_release(g_cx, g_cy);
@@ -479,6 +499,7 @@ int qz_wm_run_once(void)
                 qz_window_move(g_drag, nx, ny);
             }
         } else {
+            qz_mouse_read(&m);
             if (kc_dx || kc_dy) {
                 g_cx += kc_dx; g_cy += kc_dy;
                 if (g_cx < 0) g_cx = 0;

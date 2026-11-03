@@ -17,7 +17,9 @@ SRC := src/main.c \
        src/input/mouse.c src/input/keyboard.c \
        src/wm/wm.c src/wm/widget.c \
        src/net/net.c \
-       src/audio/sb16.c
+       src/audio/sb16.c \
+       src/hal/pci.c src/sys/serial.c \
+       src/drivers/usb/xhci.c
 
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
 

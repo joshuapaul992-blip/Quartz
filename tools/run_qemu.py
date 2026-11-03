@@ -67,6 +67,10 @@ def main():
     ap.add_argument("--net", default="", help="ne2000 | pcnet | e1000 (adds a NIC + user networking)")
     ap.add_argument("--audio", default="", help="path to capture SB16 output as a WAV file")
     ap.add_argument("--keys", default="", help="comma-separated QEMU keynames to sendkey before the screenshot (e.g. right,right,down,ret)")
+    ap.add_argument("--usb", action="store_true", help="attach an xHCI controller + USB mouse")
+    ap.add_argument("--usbkbd", action="store_true", help="attach an xHCI controller + USB keyboard")
+    ap.add_argument("--usbboth", action="store_true", help="attach xHCI + USB keyboard + USB mouse")
+    ap.add_argument("--mouse-move", default="", help="QMP relative mouse moves 'dx,dy;dx,dy;...' injected before the screenshot")
     args = ap.parse_args()
 
     tmpd = tempfile.mkdtemp(prefix="quartz-qemu-")
@@ -100,6 +104,13 @@ def main():
     if args.audio:
         cmd += ["-audiodev", "wav,id=snd0,path=" + args.audio,
                 "-device", "sb16,audiodev=snd0"]
+    if args.usb:
+        cmd += ["-device", "qemu-xhci,id=xhci", "-device", "usb-mouse,bus=xhci.0"]
+    if args.usbkbd:
+        cmd += ["-device", "qemu-xhci,id=xhci", "-device", "usb-kbd,bus=xhci.0"]
+    if args.usbboth:
+        cmd += ["-device", "qemu-xhci,id=xhci",
+                "-device", "usb-kbd,bus=xhci.0", "-device", "usb-mouse,bus=xhci.0"]
 
     print("launching:", " ".join(cmd), flush=True)
     proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
@@ -112,6 +123,15 @@ def main():
                 if kn:
                     hmp(monsock, "sendkey " + kn)
                     time.sleep(0.25)
+            time.sleep(1.0)
+        if args.mouse_move:
+            for pair in args.mouse_move.split(";"):
+                pair = pair.strip()
+                if not pair:
+                    continue
+                dx, dy = pair.split(",")
+                hmp(monsock, "mouse_move %s %s" % (dx.strip(), dy.strip()))
+                time.sleep(0.2)
             time.sleep(1.0)
         for i in range(args.shots):
             ppm = os.path.join(tmpd, f"shot{i}.ppm")

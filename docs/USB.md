@@ -44,6 +44,14 @@ Windows: use Rufus / balenaEtcher in "DD / raw image" mode.
   NE2000/PCnet/E1000 drivers are for other NICs / emulators). Then use the
   **Connect** button in the Network app (DHCP via `WATTCP.CFG`).
 
+## Native USB mouse (xHCI)
+Quartz now includes a native xHCI + USB-HID driver, so a **USB mouse (incl.
+USB-3) works even when the BIOS doesn't emulate it as PS/2** — no "USB Legacy
+Support" needed for the mouse. It enumerates the root-hub ports, skips the
+keyboard, and polls the mouse via HID GET_REPORT. If it can't find/own the
+controller it silently falls back to ctmouse/INT 33h, then keyboard control.
+(USB keyboard + USB storage are not handled natively yet.)
+
 ## Mouse / input
 - **Enable "USB Legacy Support" (USB keyboard/mouse emulation) in the firmware.**
   Without it, DOS can't see a USB mouse; with it, a USB mouse appears as PS/2 and

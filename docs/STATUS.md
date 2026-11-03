@@ -64,6 +64,24 @@ _Last updated: 2026-11-02_
   window's **Connect** button. No packet driver / NIC required to run.
 - For metal (RTL8169) a matching packet driver is still to be sourced (Phase 5).
 
+## M7 + M9 — PCI + native USB mouse (done, validated)
+
+- `src/hal/pci.c`: PCI config mechanism #1, enumeration, class/BAR lookup; a
+  "Devices" app lists functions and flags the xHCI controller.
+- `src/drivers/usb/xhci.c`: native xHCI bring-up (MMIO map, BIOS->OS handoff,
+  reset, DCBAA/command ring/event ring, run), root-hub port reset, Enable Slot /
+  Address Device, control transfers, config-descriptor parse. Scans all ports,
+  skips non-mouse HIDs (e.g. keyboard) and binds the mouse.
+- Mouse input via **HID GET_REPORT polling on EP0** (the reliable control path),
+  fed into the WM as the top-priority cursor source. `src/sys/serial.c` gives
+  COM1 bring-up logging.
+- Verified in QEMU (`-device qemu-xhci -device usb-mouse`): enumeration, and the
+  cursor tracks injected motion; with keyboard+mouse both attached, the scan
+  skips the keyboard and drives the mouse. This is the fix for USB-3 mice that
+  the BIOS doesn't emulate as PS/2.
+- Not yet: USB keyboard input + USB mass-storage (future M9 extension); the
+  xHCI interrupt-endpoint path (GET_REPORT polling is used instead).
+
 ## Next
 
 1. **Phase 4 — audio**: SBEMU bridging SB16 → the Realtek HDA codec; GUI sound.

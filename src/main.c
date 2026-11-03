@@ -7,6 +7,9 @@
 #include "wm/wm.h"
 #include "net/net.h"
 #include "audio/audio.h"
+#include "hal/pci.h"
+#include "sys/serial.h"
+#include "drivers/usb/usb.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -144,6 +147,47 @@ static void make_sound(void)
     qz_window_add(w, qz_button(192, 70, 100, 28, "Chime", cb_chime));
 }
 
+/* ---- Devices app (PCI enumeration) ---- */
+static const char *pci_class_name(int c)
+{
+    switch (c) {
+    case 0x01: return "storage";
+    case 0x02: return "network";
+    case 0x03: return "display";
+    case 0x04: return "multimedia";
+    case 0x06: return "bridge";
+    case 0x0C: return "serial-bus";
+    default:   return "device";
+    }
+}
+static void make_devices(void)
+{
+    static qz_pci_dev devs[48];
+    qz_pci_dev xhci;
+    qz_window *w = qz_window_new(90, 70, 420, 320, "Devices (PCI)", QZ_WF_DEFAULT);
+    int n, i, y = 12, shown;
+    char line[64];
+    if (!w) return;
+    n = qz_pci_enumerate(devs, 48);
+    sprintf(line, "%d PCI functions found:", n);
+    qz_window_add(w, qz_label(12, y, line)); y += 20;
+    shown = n < 12 ? n : 12;
+    for (i = 0; i < shown; i++) {
+        sprintf(line, "%02x:%02x.%d %-10s %04x:%04x",
+                devs[i].bus, devs[i].dev, devs[i].fn,
+                pci_class_name(devs[i].classcode), devs[i].vendor, devs[i].device);
+        qz_window_add(w, qz_label(12, y, line)); y += 16;
+    }
+    y += 8;
+    if (qz_pci_find(0x0C, 0x03, 0x30, 0, &xhci) == 0) {
+        sprintf(line, "xHCI USB3 ctrl @ %02x:%02x.%d  %04x:%04x",
+                xhci.bus, xhci.dev, xhci.fn, xhci.vendor, xhci.device);
+        qz_window_add(w, qz_label(12, y, line));
+    } else {
+        qz_window_add(w, qz_label(12, y, "No xHCI controller found"));
+    }
+}
+
 static void make_files(void)
 {
     qz_window *w = qz_window_new(560, 330, 320, 220, "Files", QZ_WF_DEFAULT);
@@ -163,6 +207,9 @@ int main(void)
 
     /* Quartz never blocks on the network at startup: the GUI comes up first and
      * TCP/IP is brought up on demand from the Network window's Connect button. */
+    qz_dbg_init();          /* COM1 debug log for bring-up */
+    qz_dbg("\n=== Quartz boot ===\n");
+    qz_usb_init();          /* native xHCI + USB HID (for USB-3 mice DOS can't emulate) */
     qz_audio_init();        /* detect Sound Blaster (QEMU SB16 / SBEMU on metal) */
 
     rc = qz_gfx_init(1024, 768);
@@ -172,6 +219,7 @@ int main(void)
 
     make_files();
     make_counter();
+    make_devices();
     make_sound();
     make_network();
     make_about();           /* opened last -> focused, on top */
