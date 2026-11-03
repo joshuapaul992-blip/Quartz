@@ -409,46 +409,16 @@ static int usb_bringup(void)
                     qz_dbg(" ep="); qz_dbg_hex(ep_addr); qz_dbg(" mps="); qz_dbg_dec(ep_mps); qz_dbg_nl();
                     if (!ep_addr) continue;        /* not a usable HID; try next port */
 
-                    /* SET_CONFIGURATION */
-                    control(0x00, 9, cfgval, 0, 0, 0);
-                    /* SET_PROTOCOL (boot=0) on the HID interface */
-                    control(0x21, 0x0B, 0, iface, 0, 0);
-
-                    /* Configure Endpoint: add the interrupt-IN endpoint */
-                    g_hid_ep = (ep_addr & 0xF) * 2 + 1;   /* IN endpoint id */
-                    g_hid_mps = ep_mps;
-                    ring_init(&hid_ring, O_HIDRING);
-                    zero(O_INCTX, 33 * g_ctxsz);
-                    ctx_set(O_INCTX, 0, 1, (1u << g_hid_ep) | 1u);  /* A(epid) | A0 */
-                    ctx_set(O_INCTX, 1, 0, ((uint32_t)speed << 20) | ((uint32_t)g_hid_ep << 27));
-                    ctx_set(O_INCTX, 1, 1, (uint32_t)p << 16);
-                    /* Interval field is speed-dependent; a wrong value makes
-                     * real controllers reject Configure Endpoint (Parameter
-                     * Error). HS/SS: bInterval-1. FS/LS: smallest exponent with
-                     * 2^iv*125us >= bInterval ms (clamped 3..10). */
-                    {
-                        int iv;
-                        if (speed >= 3) {           /* HS / SS */
-                            iv = ep_interval ? ep_interval - 1 : 3;
-                            if (iv < 0) iv = 0; if (iv > 15) iv = 15;
-                        } else {                    /* FS / LS (bInterval in ms) */
-                            int bi = ep_interval ? ep_interval : 10;
-                            iv = 3;
-                            while ((1 << iv) < bi * 8 && iv < 10) iv++;
-                        }
-                        /* interrupt-IN EP context */
-                        ctx_set(O_INCTX, g_hid_ep, 0, ((uint32_t)iv << 16));
-                        g_dbg_speed = speed; g_dbg_mps = ep_mps; g_dbg_iv = iv;
-                    }
-                    ctx_set(O_INCTX, g_hid_ep, 1, (3u << 1) | (7u << 3) | ((uint32_t)ep_mps << 16));
-                    ctx_set(O_INCTX, g_hid_ep, 2, (uint32_t)dphys(O_HIDRING) | 1);
-                    ctx_set(O_INCTX, g_hid_ep, 4, (uint32_t)ep_mps | ((uint32_t)ep_mps << 16)); /* avg TRB + Max ESIT */
-                    ring_push(&cmd_ring, (uint32_t)dphys(O_INCTX), 0, 0,
-                              (12u << 10) | ((uint32_t)g_slot << 24));
-                    dbw(0, 0);
-                    cc = wait_completion(33, 0);
-                    qz_dbg("xhci: config ep cc "); qz_dbg_dec(cc); qz_dbg_nl();
-                    if (cc != 1) return -7;
+                    /* SET_CONFIGURATION, then SET_PROTOCOL(boot) on the HID
+                     * interface. The mouse is then polled with GET_REPORT over
+                     * EP0 -- we do NOT configure the interrupt endpoint (xHCI
+                     * Configure Endpoint), so nothing here depends on that
+                     * controller command succeeding. */
+                    g_hid_ep = (ep_addr & 0xF) * 2 + 1;   /* for display only */
+                    g_dbg_speed = speed; g_dbg_mps = ep_mps;
+                    cc = control(0x00, 9, cfgval, 0, 0, 0);
+                    qz_dbg("xhci: set config cc "); qz_dbg_dec(cc); qz_dbg_nl();
+                    control(0x21, 0x0B, 0, iface, 0, 0);   /* SET_PROTOCOL boot */
 
                     g_mouse = (proto == 2 || proto == 0);  /* boot/report mouse */
                     qz_dbg("xhci: HID ready, mouse="); qz_dbg_dec(g_mouse); qz_dbg_nl();
